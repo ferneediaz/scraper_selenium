@@ -17,20 +17,36 @@ driver.get('https://www.swirecocacolahk.com/all-items/')
 
 wait = WebDriverWait(driver, 5)
 
+opened_count = 0
+total_products_found = 0
+unique_product_urls = set()
+
 while True:
     # Wait for products to load on current page.
     time.sleep(5)
-    product_links = wait.until(
-        EC.presence_of_all_elements_located((By.CSS_SELECTOR, "ul.products li.product a"))
-    )
+    product_links = wait.until(EC.presence_of_all_elements_located(
+        (By.CSS_SELECTOR, "ul.products li.product a")
+    ))
     # Extract the href attributes of the product links.
     product_urls = [link.get_attribute('href') for link in product_links]
 
-    # Visit each product page.
+    # Accumulate the total number of products encountered.
+    total_products_found += len(product_urls)
+
+    # Save the main window handle.
+    main_window = driver.current_window_handle
+    unique_product_urls.update(product_urls)
+    
+    total_products_found += len(product_urls)
+    # Visit each product page in a new tab.
     for url in product_urls:
-        driver.get(url)
+        opened_count += 1
+        driver.execute_script("window.open(arguments[0]);", url)
+        driver.switch_to.window(driver.window_handles[-1])
         time.sleep(3)
-        driver.back()
+        # Here you could add BeautifulSoup scraping code using driver.page_source
+        driver.close()
+        driver.switch_to.window(main_window)
         # Optional: wait until the products reappear.
         wait.until(EC.presence_of_all_elements_located(
             (By.CSS_SELECTOR, "ul.products li.product a")
@@ -50,13 +66,13 @@ while True:
         )
         driver.execute_script("arguments[0].scrollIntoView(true);", next_button)
         driver.execute_script("arguments[0].click();", next_button)
-
-        # Wait until new page products are loaded.
-        wait.until(
-            EC.presence_of_all_elements_located((By.CSS_SELECTOR, "ul.products li.product a"))
-        )
+        wait.until(EC.presence_of_all_elements_located(
+            (By.CSS_SELECTOR, "ul.products li.product a")
+        ))
     except Exception as e:
         print("No more pages or error:", e)
         break
 
+print(f"Opened {opened_count} product pages out of {total_products_found} products found.")
+print(f"Unique products found: {len(unique_product_urls)}")
 driver.quit()
