@@ -5,8 +5,60 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import time
-from selenium.common.exceptions import NoSuchElementException, ElementNotInteractableException
+from selenium.common.exceptions import NoSuchElementException, ElementNotInteractableException,ElementClickInterceptedException
 import re
+import csv
+import os
+
+collected_data = []
+def safe_get_element_text(selector, retries=3, delay=1):
+    for attempt in range(retries):
+        text = get_element_text(selector)
+        if text:
+            return text
+        print(f"Attempt {attempt+1} to get text for {selector} failed; retrying...")
+        time.sleep(delay)
+    return None
+def safe_click_language(selector, retries=3, delay=2):
+    """Attempts to dismiss the popup and click the language button using the given CSS selector."""
+    for attempt in range(retries):
+        try:
+            # Dismiss the popup (if present)
+            dismiss_notification_popup()
+            # Find and scroll to the language button
+            language_button = driver.find_element(By.CSS_SELECTOR, selector)
+            driver.execute_script("arguments[0].scrollIntoView(true);", language_button)
+            language_button.click()
+            time.sleep(3)  # wait for page reload
+            return True
+        except (NoSuchElementException, ElementNotInteractableException, ElementClickInterceptedException) as e:
+            print(f"Attempt {attempt+1} to click language button failed: {e}")
+            time.sleep(delay)
+    return False
+
+def dismiss_notification_popup():
+    """Dismiss the notification popup if it appears."""
+    try:
+        cancel_button = driver.find_element(By.CSS_SELECTOR, ".notification-popup__button-cancel")
+        if cancel_button.is_displayed() and cancel_button.is_enabled():
+            driver.execute_script("arguments[0].scrollIntoView(true);", cancel_button)
+            cancel_button.click()
+            time.sleep(1)  # wait for popup to close
+    except NoSuchElementException:
+        pass
+def safe_click(selector, retries=3, delay=1):
+    """Attempts to click an element using CSS selector with retries."""
+    for attempt in range(retries):
+        try:
+            element = driver.find_element(By.CSS_SELECTOR, selector)
+            if element.is_displayed() and element.is_enabled():
+                driver.execute_script("arguments[0].scrollIntoView(true);", element)
+                element.click()
+                time.sleep(delay)
+                return True
+        except (ElementClickInterceptedException, ElementNotInteractableException):
+            time.sleep(delay)
+    return False
 
 def get_element_text(selector):
     """Extracts text from an element using CSS selector."""
@@ -60,7 +112,7 @@ service = Service(executable_path='chromedriver.exe')
 driver = webdriver.Chrome(service=service, options=chrome_options)
 
 driver.get('https://www.swirecocacolahk.com/all-items/')
-wait = WebDriverWait(driver, 10)  # Increased timeout
+wait = WebDriverWait(driver, 15)  # Increased timeout
 
 opened_count = 0
 total_products_found = 0
@@ -72,15 +124,15 @@ while True:
     product_links = wait.until(EC.presence_of_all_elements_located(
         (By.CSS_SELECTOR, "ul.products li.product a")
     ))
-    # Check for notification pop-up and click "Cancel" if present
-    try:
-        cancel_button = driver.find_element(By.CSS_SELECTOR, ".notification-popup__button-cancel")
-        if cancel_button.is_displayed() and cancel_button.is_enabled():
-            driver.execute_script("arguments[0].scrollIntoView(true);", cancel_button)
-            cancel_button.click()
-            time.sleep(1)  # Wait for the pop-up to close
-    except NoSuchElementException:
-        pass  # No pop-up found, continue
+    # # Check for notification pop-up and click "Cancel" if present
+    # try:
+    #     cancel_button = driver.find_element(By.CSS_SELECTOR, ".notification-popup__button-cancel")
+    #     if cancel_button.is_displayed() and cancel_button.is_enabled():
+    #         driver.execute_script("arguments[0].scrollIntoView(true);", cancel_button)
+    #         cancel_button.click()
+    #         time.sleep(1)  # Wait for the pop-up to close
+    # except NoSuchElementException:
+    #     pass  # No pop-up found, continue
     # Extract href attributes from product links.
     product_urls = [link.get_attribute('href') for link in product_links]
     unique_product_urls.update(product_urls)
@@ -99,14 +151,14 @@ while True:
         time.sleep(3)
 
         # Check for notification pop-up and click "Cancel" if present
-        try:
-            cancel_button = driver.find_element(By.CSS_SELECTOR, ".notification-popup__button-cancel")
-            if cancel_button.is_displayed() and cancel_button.is_enabled():
-                driver.execute_script("arguments[0].scrollIntoView(true);", cancel_button)
-                cancel_button.click()
-                time.sleep(1)  # Wait for the pop-up to close
-        except NoSuchElementException:
-            pass  # No pop-up found, continue
+        # try:
+        #     cancel_button = driver.find_element(By.CSS_SELECTOR, ".notification-popup__button-cancel")
+        #     if cancel_button.is_displayed() and cancel_button.is_enabled():
+        #         driver.execute_script("arguments[0].scrollIntoView(true);", cancel_button)
+        #         cancel_button.click()
+        #         time.sleep(1)  # Wait for the pop-up to close
+        # except NoSuchElementException:
+        #     pass  # No pop-up found, continue
 
         # ---- Extract product details ----
         product_name = get_element_text("h1.product_title.entry-title.elementor-heading-title.elementor-size-default")
@@ -152,37 +204,37 @@ while True:
             "Product Photo URL": product_photo_url,
             "Product Price": product_price if product_price else 'Not Available'
         }
-        try:
-            cancel_button = driver.find_element(By.CSS_SELECTOR, ".notification-popup__button-cancel")
-            if cancel_button.is_displayed() and cancel_button.is_enabled():
-                driver.execute_script("arguments[0].scrollIntoView(true);", cancel_button)
-                cancel_button.click()
-                time.sleep(1)  # Wait for the pop-up to close
-        except NoSuchElementException:
-            pass  # No pop-up found, continue
+        # try:
+        #     cancel_button = driver.find_element(By.CSS_SELECTOR, ".notification-popup__button-cancel")
+        #     if cancel_button.is_displayed() and cancel_button.is_enabled():
+        #         driver.execute_script("arguments[0].scrollIntoView(true);", cancel_button)
+        #         cancel_button.click()
+        #         time.sleep(1)  # Wait for the pop-up to close
+        # except NoSuchElementException:
+        #     pass  # No pop-up found, continue
+        # # ---- Change language to Chinese and extract product name again ----
         # ---- Change language to Chinese and extract product name again ----
-        try:
-            language_button = driver.find_element(By.CSS_SELECTOR, "li.wpml-ls-item-zh-hant")
-            driver.execute_script("arguments[0].scrollIntoView(true);", language_button)
-            language_button.click()
-            time.sleep(3)  # Wait for the page to reload
+        # ---- Change language to Chinese and extract product name again ----
+        if safe_click_language("li.wpml-ls-item-zh-hant", retries=3, delay=2):
             product_name_chinese = get_element_text("h1.product_title.entry-title.elementor-heading-title.elementor-size-default")
             product_details["Product Name (Chinese)"] = product_name_chinese
             if re.search(r'\bQoo\b', product_name, flags=re.IGNORECASE):
                 product_brand = "Minute Maid"
-            elif re.search(r'\bAqueous\b', product_name, flags=re.IGNORECASE):
+            elif re.search(r'\bAqueous\b', product_name, flags=re.IGNORECASE) or re.search(r'\baqueous\b', product_name, flags=re.IGNORECASE):
                 product_brand = "Bonaqua"
-        except (NoSuchElementException, ElementNotInteractableException):
-            print("Language change button not found or not interactable")
+            # Update the product details dictionary with the new brand value.
+                product_details["Product Brand"] = product_brand
+        else:
+            print("Language change button not found or not interactable after multiple attempts")
             product_details["Product Name (Chinese)"] = None
-
+        collected_data.append(product_details)
         # Print all details together
         print("\n" + "="*40)
         print(f"Product URL: {url}")
         for key, value in product_details.items():
             print(f"{key}: {value}")
         print("="*40 + "\n")
-
+        
         driver.close()
         driver.switch_to.window(main_window)
 
@@ -213,7 +265,18 @@ while True:
     except Exception as e:
         print("No more pages or error:", e)
         break
+# Write collected data to a CSV file
+fieldnames = ["Product Name", "Product Code", "Product Unit", "Product Package", "Product Brand",
+              "Product Category", "Product SKU", "Product Description", "Product Photo URL", 
+              "Product Price", "Product Name (Chinese)"]
 
+with open("products.csv", "w", newline="", encoding="utf-8-sig") as csvfile:
+    writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+    writer.writeheader()
+    for row in collected_data:
+        writer.writerow(row)
 print(f"Opened {opened_count} product pages out of {total_products_found} products found.")
 print(f"Unique products found: {len(unique_product_urls)}")
 driver.quit()
+
+os.startfile("products.csv")
